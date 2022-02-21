@@ -1,0 +1,11 @@
+body {
+    background-color:lightblue;
+    flex: 1;
+    min-height: 100%;
+    flex-direction:column;
+}
+
+.page-container{
+    display: block;
+    flex: 1;
+}
