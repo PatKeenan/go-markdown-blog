@@ -1,60 +1,61 @@
-package main
+package main 
 
 import (
-	"html/template"
-	"log"
-	"net/http"
-	"path/filepath"
+    "fmt"
     "os"
+    "log"
+    "net/http"
+    "github.com/gomarkdown/markdown"
 )
 
-func main() {
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	http.HandleFunc("/", serveTemplate)
-
-	log.Println("Listening on :3000...")
-	err := http.ListenAndServe(":3000", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+type Page struct {
+    Title string
+    Body []byte
 }
 
-func serveTemplate(w http.ResponseWriter, r *http.Request) {
-	lp := filepath.Join("static/templates", "layout.html")
-	fp := filepath.Join("static/templates", filepath.Clean(r.URL.Path))
-
-
-    // Check if template is available, if not send 404
-    
-    info, err := os.Stat(fp)
-    if err != nil {
-        if os.IsNotExist(err){
-            http.NotFound(w,r)
-            return
-        }
-    }
-
-    // Send 404 if the client is requesting a directory
-    if info.IsDir() {
-        http.NotFound(w,r)
-        return
-    }
-
-	tmpl, err := template.ParseFiles(lp, fp)
-
-    if err != nil {
-        log.Println(err.Error())
-        http.Error(w, http.StatusText(500), 500)
-        return
-    }
-    
-    
-	err = tmpl.ExecuteTemplate(w, "layout", nil)
-    if err != nil {
-        log.Println(err.Error())
-        http.Error(w, http.StatusText(500), 500)
-    }
+func (p *Page) save() error{
+    filename := p.Title + ".txt"
+    return os.WriteFile(filename, p.Body, 0600)
 }
 
+func loadPage(title string) *Page {
+    filename := title + ".md"
+    body, err := os.ReadFile("./posts/" + filename)
+    if err != nil {
+        return nil 
+    }
+    convertedBody := markdown.ToHTML(body, nil, nil)
+    return &Page{Title: title, Body: convertedBody}
+}
+
+func generator(){
+ p1 := &Page{Title: "TestPage", Body:[]byte("This is a sample page.")}
+ p1.save()
+ p2 := loadPage("TestPage")
+ fmt.Println(string(p2.Body))
+}
+
+func viewHandler(w http.ResponseWriter, r *http.Request){
+    title := r.URL.Path[len("/view/"):]
+    p := loadPage(title)
+    fmt.Fprintf(w, "<h1>%s</h1><div>%s</div>", p.Title, p.Body)
+}
+
+func editHandler (w http.ResponseWriter, r *http.Request){
+    title := r.URL.Path[len("/edit/"):]
+    p := loadPage(title)
+    fmt.Fprintf(w, "<h1>Editing %s</h1>"+
+        "<form action=\"/save/%s\" method=\"POST\">"+
+        "<textarea name=\"body\">%s</textarea><br>"+
+        "<input type=\"submit\" value=\"Save\">"+
+        "</form>",
+        p.Title, p.Title, p.Body)
+
+}
+
+func main(){
+    http.HandleFunc("/view/", viewHandler)
+    http.HandleFunc("/edit/", editHandler)
+    log.Fatal(http.ListenAndServe(":3000", nil))
+}
