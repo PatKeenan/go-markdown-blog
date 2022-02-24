@@ -9,3 +9,8 @@ body {
     display: block;
     flex: 1;
 }
+
+h1 {
+    font-size: 24px;
+    color: lightgray;
+}
